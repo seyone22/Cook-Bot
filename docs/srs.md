@@ -1,113 +1,124 @@
-# Software Requirements Specification (SRS) – Cook Bot
+# Software Requirements Specification (SRS) – Cook Bot (Simplified Chatbot)
 
 ## 1. Introduction
 
 ### 1.1 Purpose
-This document specifies the requirements for a prototype AI-powered chatbot that maintains a persistent inventory of a user’s fridge and provides conversational assistance for meal suggestions. The chatbot demonstrates **frontend + AI model integration**, **conversation memory management**, and **application state management**.
+This document specifies the requirements for a **local AI-powered chatbot** that runs on a CPU, using a Qwen 4B model with llama-cpp-python. The chatbot maintains a **sliding-window conversation memory** and provides **context-aware responses** through a FastAPI backend and a Next.js frontend.
 
 ### 1.2 Scope
 The chatbot allows users to:
 - Chat naturally with an AI assistant.
-- Query and update the state of their fridge inventory.
-- Receive meal suggestions based on current fridge contents.
-- Maintain the conversation context efficiently without resending the full chat history each time.
+- Maintain **recent conversation context** efficiently to avoid token overflow.
+- Run entirely locally on a laptop without GPU dependency.
 
 The solution will be delivered as:
-- A simple **web-based chat interface**.
-- A **backend service** managing both LLM calls and inventory state.
-- A **memory management layer** handling conversation summarization and efficient context building.
+- A **web-based chat interface** using Next.js.
+- A **FastAPI backend** managing LLM calls and memory state.
+- A **memory management layer** using sliding-window history.
 
 ### 1.3 Intended Audience
-- Hiring evaluators reviewing technical design and implementation quality.
+- Developers and evaluators reviewing technical design, architecture, and implementation quality.
 
+---
 
 ## 2. System Overview
 
 ### 2.1 High-Level Architecture
-- **Frontend (React/Next.js)**: Chat UI, optional fridge state panel (based on time constraints).
-- **Backend (Node.js/Express or Python/FastAPI)**:
-    - Chat API: manages messages, builds LLM context.
-    - Fridge API: CRUD operations on inventory state.
-- **Memory Layer**:
-    - Sliding window for recent turns.
-    - Summarization for older history.
-    - Persistent state for fridge contents.
-- **AI Integration**: OpenAI GPT (or equivalent LLM) with system prompt configured as a “kitchen assistant.”
+- **Frontend (Next.js/React)**:  
+  - Chat interface for user messages and AI responses.  
+  - Simple, minimalistic UI.  
 
+- **Backend (Python/FastAPI)**:  
+  - Chat API: receives messages, passes context to Qwen 4B, returns responses.  
+  - Memory manager: maintains sliding-window conversation history.
+
+- **Memory Layer**:  
+  - Sliding window of recent conversation turns (configurable size).  
+  - Prevents token overflow by sending only the last N messages to the model.
+
+- **AI Integration**:  
+  - Qwen 4B model (local `.gguf` file) using **llama-cpp-python**.
+
+---
 
 ## 3. Functional Requirements
 
 ### 3.1 Core Features
 - **Chat Interface**
-    - User can send text messages.
-    - Bot replies with context-aware responses.
-
-- **Fridge State Management**
-    - User can query fridge contents.
-    - User can add/remove/update items by chatting (e.g., “I ate 2 eggs”).
-    - Backend ensures inventory persistence during the session.
-
-- **Meal Suggestions**
-    - Bot suggests meals based on fridge state and conversation context.
+  - User can send text messages.
+  - Bot replies with **context-aware responses**.
 
 - **Memory Management**
-    - Maintain a sliding window of recent turns.
-    - Summarize older messages into a digest for continuity.
-    - Avoid sending entire history on each request.
+  - Maintain a **sliding window** of recent conversation turns.
+  - Older messages outside the window are discarded.
+  - History is formatted as a prompt string for the model.
+
+- **LLM Integration**
+  - Local inference using **Qwen 4B** with llama-cpp-python.
+  - CPU-only execution (no GPU dependency).
+  - Configurable context size to match model capacity.
 
 ### 3.2 APIs
-TODO
+- **POST `/chat/`**
+  - Request: 
+    ```json
+    { "prompt": "<user message>" }
+    ```
+  - Response: 
+    ```json
+    { "response": "<AI reply>" }
+    ```
 
+- **POST `/chat/stream`** (optional)
+  - Request: 
+    ```json
+    { "prompt": "<user message>" }
+    ```
+  - Response: Streaming text response in chunks.
+
+---
 
 ## 4. Non-Functional Requirements
 
-- **Performance**:
-    - Responses within 2–3 seconds (excluding LLM latency).
-    - Efficient context building (token limit not exceeded).
+- **Performance**
+  - Response within **2–3 seconds** on CPU.
+  - Efficient prompt construction to avoid exceeding token limit.
 
-- **Scalability**:
-    - Architecture supports plugging in a persistent DB (Redis) for fridge state.
-    - Memory system can be extended with embeddings (vector DB) (If time allows).
+- **Scalability**
+  - Modular backend structure, allowing future addition of multi-user support or embeddings.
 
-- **Usability**:
-    - Clean, minimal chat UI.
-    - Clear feedback when fridge state updates.
+- **Usability**
+  - Minimal chat UI.
+  - Smooth text display, optionally streaming responses.
 
-- **Maintainability**:
-    - Modular backend structure (separate controllers for chat + fridge).
-    - Well-documented code.
+- **Maintainability**
+  - Clear separation of frontend, backend, and memory layers.
+  - Well-documented code with reusable modules.
 
-- **Portability**:
-    - Should run locally via Docker or Node + NPM setup.
-    - Deploy on Vercel / CloudFlare
+- **Portability**
+  - Runs locally with CPU.
+  - Can be deployed via Docker or standard Python environment.
+  - Frontend runs on Next.js dev server or production build.
+
+---
 
 ## 5. Use Cases
 
-### UC1: Query Fridge Contents
+### UC1: Basic Chat
 **Actor**: User  
-**Precondition**: Fridge state exists.  
+**Precondition**: Chatbot is running.  
 **Steps**:
-1. User asks: “What’s in my fridge?”
-2. Backend retrieves state.
-3. Bot responds with item list.
+1. User sends a message: “Hello, how are you?”  
+2. Backend appends message to sliding window memory.  
+3. Backend sends prompt to Qwen 4B model.  
+4. Bot responds with context-aware reply.  
+5. Backend appends AI response to memory.  
 
-### UC2: Update Fridge Contents
-**Actor**: User  
-**Precondition**: Fridge has items.  
-**Steps**:
-1. User says: “I ate 2 eggs.”
-2. Backend parses intent → updates inventory.
-3. Bot confirms: “Got it, you now have 2 eggs left.”
-
-### UC3: Suggest Dinner
-**Actor**: User  
-**Steps**:
-1. User asks: “What can I cook tonight?”
-2. Backend passes fridge state + recent history to LLM.
-3. Bot suggests meal idea.
+---
 
 ## 6. Assumptions and Limitations
-- Fridge inventory is a simplified structure (item + quantity).
-- No authentication/multi-user support (demo scope).
-- Natural language inventory updates will use simple parsing (not full NLP pipeline).
-- Chatbot uses external LLM API (not local inference).
+- **Single-user** system; no authentication.
+- Chat context is **limited to sliding-window size**.
+- Runs locally; GPU is optional but not required.
+- No persistent storage of conversation; memory resets on server restart.
+- Only text-based interaction; no voice or multimedia.
