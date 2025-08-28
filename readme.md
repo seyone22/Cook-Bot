@@ -109,15 +109,6 @@ npm install
 npm run dev
 ```
 
----
-
 ## License
 
 MIT License
-
-```
-
-This README clearly explains **project structure, setup, Docker usage, and endpoints**.  
-
-Do you want me to also add **testing instructions for the backend endpoints** using the `.http` test file?
-```
