@@ -1,0 +1,18 @@
+### Test regular chat endpoint
+POST http://127.0.0.1:8000/chat/
+Content-Type: application/json
+
+{
+      "prompt": "What is the square root of 9"
+}
+
+### Test streaming chat endpoint
+POST http://127.0.0.1:8000/chat/stream
+Content-Type: application/json
+
+{
+  "prompt": "Hello there"
+}
+
+### Optional: Fridge endpoint (if implemented)
+GET http://127.0.0.1:8000/fridge/
