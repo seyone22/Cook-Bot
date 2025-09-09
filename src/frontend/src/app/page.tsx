@@ -1,100 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
+import {Box, Button, FormControl, InputLabel, MenuItem, Paper, Select, Stack, TextField,} from "@mui/material";
+import styles from "./page.module.css";
+import {ChatContainer, Message} from "@/app/components/ChatContainer";
+
+const defaultSessions = ["session_1", "session_2", "session_3"];
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
-  const [input, setInput] = useState("");
 
-  async function sendMessage() {
-    if (!input.trim()) return;
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState("");
+    const [sessionId, setSessionId] = useState(defaultSessions[0]);
 
-    // Add user message locally
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    async function sendMessage() {
+        if (!input.trim()) return;
 
-    // Call backend API
-    const res = await fetch("http://localhost:8000/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "qwen3-4b", // match what you’re running in backend
-        prompt: userMessage.content,
-      }),
-    });
+        const userMessage = { role: "user", content: input };
+        setMessages((prev: any) => [...prev, userMessage]);
+        setInput("");
 
-    const data = await res.json();
+        try {
+            const res = await fetch("/api/llm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId, message: userMessage.content }),
+            });
 
-    const assistantMessage = {
-      role: "assistant",
-      content: data.response || "[No response]",
-    };
+            const data = await res.json();
+            const assistantMessage = { role: "assistant", content: data.reply || "[No response]" };
+            setMessages((prev: any) => [...prev, assistantMessage]);
+        } catch (err) {
+            console.error(err);
+            setMessages((prev) => [...prev, { role: "assistant", content: "[Error connecting to backend]" }]);
+        }
+    }
 
-    setMessages((prev) => [...prev, assistantMessage]);
-    setInput("");
-  }
+    return (
+        <Box className={styles.container}>
+            {/* Session Selector */}
+            <FormControl className={styles.sessionSelector}>
+                <InputLabel>Session</InputLabel>
+                <Select
+                    value={sessionId}
+                    label="Session"
+                    onChange={(e) => {
+                        setSessionId(e.target.value);
+                        setMessages([]);
+                    }}
+                >
+                    {defaultSessions.map((s) => (
+                        <MenuItem key={s} value={s}>
+                            {s}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
 
-  return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "1rem" }}>
-          {messages.map((m, i) => (
-              <div
-                  key={i}
-                  style={{
-                    margin: "0.5rem 0",
-                    textAlign: m.role === "user" ? "right" : "left",
-                  }}
-              >
-            <span
-                style={{
-                  display: "inline-block",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "12px",
-                  background: m.role === "user" ? "#0070f3" : "#e5e5ea",
-                  color: m.role === "user" ? "#fff" : "#000",
-                  maxWidth: "70%",
-                  wordWrap: "break-word",
-                }}
-            >
-              {m.content}
-            </span>
-              </div>
-          ))}
-        </div>
-
-        {/* Input */}
-        <div style={{ display: "flex", padding: "1rem", borderTop: "1px solid #ddd" }}>
-          <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a message..."
-              style={{
-                flex: 1,
-                padding: "0.75rem",
-                border: "1px solid #ccc",
-                borderRadius: "8px",
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") sendMessage();
-              }}
-          />
-          <button
-              onClick={sendMessage}
-              style={{
-                marginLeft: "0.5rem",
-                padding: "0.75rem 1rem",
-                background: "#0070f3",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-              }}
-          >
-            Send
-          </button>
-        </div>
-      </div>
-  );
+            {/* Chat */}
+            <ChatContainer messages={messages} input={input} setInput={setInput} sendMessage={sendMessage} />
+        </Box>
+    );
 }
